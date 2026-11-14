@@ -5,6 +5,7 @@ version calculation, repository-specific validation and release completion gates
 
 | Workflow | Contract |
 | --- | --- |
+| `python-checks.yml` | Sets up supported Python versions, installs optional requirements and runs repository checks |
 | `pr-title.yml` | Validates the shared Conventional Commit grammar |
 | `promote-image.yml` | Copies an already released GHCR manifest to latest, preserving its format and architectures |
 | `npm-build-publish.yml` | Installs locked dependencies, runs selected scripts and optionally publishes an npm package |
@@ -71,3 +72,22 @@ repository Secret. Normal reusable calls check out the caller repository.
 Image promotion is call-only because it belongs after the caller's completed
 release gate. Retry its job from that release run. GitOps can keep its existing
 single validation workflow directly when shared orchestration adds no value.
+
+## Shared language checks
+
+Application CI runs its test jobs for pull requests and pushes to main. A release
+job depends on successful validation and runs for a main push. The release
+workflow is callable by that CI entry point.
+
+- Python callers use python-checks.yml with their supported versions, optional
+  requirements file and repository test command. An optional additional command
+  retains workflow linting after a failed primary check.
+- JavaScript and TypeScript callers use npm-build-publish.yml with publish false.
+  npm ci, the selected test script and build script run in the caller directory.
+- Java callers use java-build-publish.yml with publish false. Maven verify runs
+  the project's tests, build and verification plugins. An optional prerequisite
+  command checks project-specific contracts before Maven starts.
+
+Commands are reviewed repository code supplied by the caller. Shared workflows
+handle toolchains and execution, and application scripts select their assertions.
+Python, npm and Maven checks all have manual dispatch entry points.
