@@ -56,3 +56,19 @@ by the caller.
 
 This public repository contains generic CI code for public and private callers.
 Credentials and personal infrastructure configuration stay outside it.
+
+## Orchestration and manual execution
+
+Caller entry points select events and sequence reusable jobs. A CI or Main
+workflow runs checks for pull requests and pushes, then calls the application's
+release workflow for a validated main commit. Reusable application workflows
+use workflow_call, with workflow_dispatch for meaningful isolated runs.
+
+The shared title workflow accepts a manual title check. The shared npm and Maven
+workflows can be dispatched against a public source repository with explicit
+toolchain settings. Publication is off by default and requires the corresponding
+repository Secret. Normal reusable calls check out the caller repository.
+
+Image promotion is call-only because it belongs after the caller's completed
+release gate. Retry its job from that release run. GitOps can keep its existing
+single validation workflow directly when shared orchestration adds no value.

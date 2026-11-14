@@ -17,9 +17,36 @@ on:
       server-id:
         type: string
         default: github
+      repository:
+        description: Source repository, defaults to the caller
+        type: string
+        required: false
+        default: ''
     secrets:
       maven-token:
         required: false
+  workflow_dispatch:
+    inputs:
+      java-version:
+        type: string
+        required: true
+        description: Toolchain version
+      working-directory:
+        type: string
+        default: .
+      distribution:
+        type: string
+        default: temurin
+      publish:
+        type: boolean
+        default: false
+      server-id:
+        type: string
+        default: github
+      repository:
+        description: Public source repository for this standalone run
+        type: string
+        required: true
 permissions:
   contents: read
 jobs:
@@ -31,6 +58,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          repository: ${{ inputs.repository || github.repository }}
           persist-credentials: false
       - uses: actions/setup-java@v6
         with:

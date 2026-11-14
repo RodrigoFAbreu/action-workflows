@@ -20,9 +20,39 @@ on:
       registry-url:
         type: string
         default: https://registry.npmjs.org
+      repository:
+        description: Source repository, defaults to the caller
+        type: string
+        required: false
+        default: ''
     secrets:
       npm-token:
         required: false
+  workflow_dispatch:
+    inputs:
+      node-version:
+        type: string
+        required: true
+        description: Toolchain version
+      working-directory:
+        type: string
+        default: .
+      test-script:
+        type: string
+        default: test
+      build-script:
+        type: string
+        default: build
+      publish:
+        type: boolean
+        default: false
+      registry-url:
+        type: string
+        default: https://registry.npmjs.org
+      repository:
+        description: Public source repository for this standalone run
+        type: string
+        required: true
 permissions:
   contents: read
 jobs:
@@ -34,6 +64,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          repository: ${{ inputs.repository || github.repository }}
           persist-credentials: false
       - uses: actions/setup-node@v6
         with:

@@ -5,6 +5,12 @@ on:
       title:
         type: string
         required: false
+  workflow_dispatch:
+    inputs:
+      title:
+        description: Conventional Commit title to validate
+        type: string
+        required: true
 permissions:
   contents: read
 jobs:
