@@ -18,22 +18,21 @@ and app releases retain their own runtime and signing validations.
 
 ## Calling the workflows
 
-Use a reviewed release tag such as `v1.0.0`, or the compatible `v1` series tag.
-The first publication is `v1.0.0`, with the compatible major alias `v1`.
-Consumers select that release or the major alias. Later shared workflow changes
-use reviewed PRs and pass Workflow checks before release tags are advanced.
+Call reusable workflows through `@main`. Reviewed merges to this protected
+branch become available to callers on their next workflow run. Workflow changes
+use PRs and pass Workflow checks. Consumers follow the branch directly.
 
 ```yaml
 jobs:
   title:
-    uses: RodrigoFAbreu/action-workflows/.github/workflows/pr-title.yml@v1
+    uses: RodrigoFAbreu/action-workflows/.github/workflows/pr-title.yml@main
   latest:
     needs: [version, image, release]
     if: needs.version.outputs.next != ''
     permissions:
       contents: read
       packages: write
-    uses: RodrigoFAbreu/action-workflows/.github/workflows/promote-image.yml@v1
+    uses: RodrigoFAbreu/action-workflows/.github/workflows/promote-image.yml@main
     with:
       image: ghcr.io/example/application
       source: ghcr.io/example/application@${{ needs.image.outputs.digest }}
