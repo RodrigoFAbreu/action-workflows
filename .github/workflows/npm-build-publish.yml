@@ -1,0 +1,63 @@
+name: Build and optionally publish npm package
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        type: string
+        required: true
+      working-directory:
+        type: string
+        default: .
+      test-script:
+        type: string
+        default: test
+      build-script:
+        type: string
+        default: build
+      publish:
+        type: boolean
+        default: false
+      registry-url:
+        type: string
+        default: https://registry.npmjs.org
+    secrets:
+      npm-token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  npm:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          registry-url: ${{ inputs.registry-url }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+      - run: npm ci
+      - name: Test
+        if: inputs.test-script != ''
+        env:
+          SCRIPT: ${{ inputs.test-script }}
+        run: npm run "$SCRIPT"
+      - name: Build
+        if: inputs.build-script != ''
+        env:
+          SCRIPT: ${{ inputs.build-script }}
+        run: npm run "$SCRIPT"
+      - name: Publish package
+        if: inputs.publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.npm-token }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          test "$EVENT_NAME" != pull_request
+          test -n "$NODE_AUTH_TOKEN"
+          npm publish

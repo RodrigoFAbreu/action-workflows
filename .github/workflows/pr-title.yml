@@ -1,0 +1,27 @@
+name: Validate PR title
+on:
+  workflow_call:
+    inputs:
+      title:
+        type: string
+        required: false
+permissions:
+  contents: read
+jobs:
+  validate:
+    name: Validate PR title
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check Conventional Commit title
+        env:
+          PR_TITLE: ${{ inputs.title || github.event.pull_request.title }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          title = os.environ['PR_TITLE']
+          pattern = r'(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert)(\([a-z0-9._/-]+\))?!?: \S.*'
+          if not re.fullmatch(pattern, title):
+              raise SystemExit('Expected a Conventional Commit PR title')
+          print('Conventional Commit title passed')
+          PY

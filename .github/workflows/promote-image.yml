@@ -1,0 +1,45 @@
+name: Promote released image
+on:
+  workflow_call:
+    inputs:
+      image:
+        type: string
+        required: true
+      source:
+        description: Released repository image reference with its manifest digest
+        type: string
+        required: true
+permissions:
+  contents: read
+  packages: write
+jobs:
+  promote:
+    name: Promote released image to latest
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check promotion source
+        env:
+          IMAGE: ${{ inputs.image }}
+          SOURCE: ${{ inputs.source }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          image = os.environ['IMAGE']
+          source = os.environ['SOURCE']
+          if not re.fullmatch(r'ghcr\.io/[a-z0-9._/-]+', image):
+              raise SystemExit('Expected a GHCR image repository')
+          if not re.fullmatch(re.escape(image) + r'@sha256:[a-f0-9]{64}', source):
+              raise SystemExit('Promotion source must be a digest from the same repository')
+          PY
+      - uses: docker/setup-buildx-action@v3
+      - name: Promote the released manifest
+        env:
+          TOKEN: ${{ github.token }}
+          IMAGE: ${{ inputs.image }}
+          SOURCE: ${{ inputs.source }}
+        run: |
+          printf '%s' "$TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io >/dev/null' EXIT
+          docker buildx imagetools create --prefer-index=false \
+            --tag "$IMAGE:latest" "$SOURCE"

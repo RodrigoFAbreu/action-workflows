@@ -1,0 +1,53 @@
+name: Build and optionally publish Maven artifacts
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        type: string
+        required: true
+      working-directory:
+        type: string
+        default: .
+      distribution:
+        type: string
+        default: temurin
+      publish:
+        type: boolean
+        default: false
+      server-id:
+        type: string
+        default: github
+    secrets:
+      maven-token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  maven:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: ${{ inputs.distribution }}
+          java-version: ${{ inputs.java-version }}
+          cache: maven
+          server-id: ${{ inputs.server-id }}
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_TOKEN
+      - run: ./mvnw --batch-mode verify
+      - name: Publish artifacts
+        if: inputs.publish
+        env:
+          MAVEN_USERNAME: ${{ github.actor }}
+          MAVEN_TOKEN: ${{ secrets.maven-token }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          test "$EVENT_NAME" != pull_request
+          test -n "$MAVEN_TOKEN"
+          ./mvnw --batch-mode deploy -DskipTests
