@@ -9,6 +9,7 @@ version calculation, repository-specific validation and release completion gates
 | `promote-image.yml` | Copies an already released GHCR manifest to latest, preserving its format and architectures |
 | `npm-build-publish.yml` | Installs locked dependencies, runs selected scripts and optionally publishes an npm package |
 | `java-build-publish.yml` | Runs Maven Wrapper verify and optionally deploys Maven artifacts |
+| `gitops-validate.yml` | Installs Helm/schema validators and runs the caller repository's tests and GitOps validation script |
 
 The language workflows publish package artifacts. Container image build and
 multi-platform assembly remain with the application release pipeline until their
@@ -18,9 +19,9 @@ and app releases retain their own runtime and signing validations.
 ## Calling the workflows
 
 Use a reviewed release tag such as `v1.0.0`, or the compatible `v1` series tag.
-Before the first reviewed release, the workflow files are available on their
-review branch for validation. First merge and validate the shared workflow
-repository, then publish its release tags, then adopt the tagged calls.
+The first publication is `v1.0.0`, with the compatible major alias `v1`.
+Consumers select that release or the major alias. Later shared workflow changes
+use reviewed PRs and pass Workflow checks before release tags are advanced.
 
 ```yaml
 jobs:
@@ -53,6 +54,5 @@ the project's distributionManagement and selected server ID. Empty test or build
 script names explicitly omit those npm stages. Toolchain versions are selected
 by the caller.
 
-This repository contains generic CI code. Its public visibility is required for
-public caller repositories. Publication awaits Rodrigo's explicit visibility
-approval. Credentials and personal infrastructure configuration stay outside it.
+This public repository contains generic CI code for public and private callers.
+Credentials and personal infrastructure configuration stay outside it.

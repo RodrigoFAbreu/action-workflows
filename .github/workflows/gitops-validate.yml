@@ -1,0 +1,42 @@
+name: Validate GitOps resources
+on:
+  workflow_call:
+    inputs:
+      helm-version:
+        type: string
+        default: v4.3.1
+      kubeconform-version:
+        type: string
+        default: v0.8.0
+permissions:
+  contents: read
+jobs:
+  validate:
+    name: Validate GitOps resources
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@v4
+        with:
+          version: ${{ inputs.helm-version }}
+      - name: Install validators
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KUBECONFORM_VERSION: ${{ inputs.kubeconform-version }}
+        run: |
+          python3 -m pip install 'PyYAML>=6,<7'
+          tools=$(mktemp -d)
+          gh release download "$KUBECONFORM_VERSION" --repo yannh/kubeconform \
+            --pattern kubeconform-linux-amd64.tar.gz --pattern CHECKSUMS --dir "$tools"
+          (
+            cd "$tools"
+            grep '  kubeconform-linux-amd64.tar.gz$' CHECKSUMS | sha256sum --check -
+            tar -xf kubeconform-linux-amd64.tar.gz
+          )
+          echo "$tools" >> "$GITHUB_PATH"
+      - name: Test validation failure cases
+        run: python3 -m unittest discover -s tests -v
+      - name: Check assignments, matrix and Kubernetes manifests
+        run: python3 scripts/check_gitops.py

@@ -1,0 +1,18 @@
+name: PR title
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+permissions:
+  contents: read
+jobs:
+  title:
+    uses: ./.github/workflows/pr-title.yml
+  required:
+    name: Conventional Commit title
+    needs: title
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          RESULT: ${{ needs.title.result }}
+        run: test "$RESULT" = success
