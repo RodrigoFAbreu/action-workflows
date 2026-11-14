@@ -18,22 +18,21 @@ and app releases retain their own runtime and signing validations.
 
 ## Calling the workflows
 
-Use a reviewed release tag such as `v1.0.0`, or the compatible `v1` series tag.
-The first publication is `v1.0.0`, with the compatible major alias `v1`.
-Consumers select that release or the major alias. Later shared workflow changes
-use reviewed PRs and pass Workflow checks before release tags are advanced.
+Call reusable workflows through `@main`. Reviewed merges to this protected
+branch become available to callers on their next workflow run. Workflow changes
+use PRs and pass Workflow checks. Consumers follow the branch directly.
 
 ```yaml
 jobs:
   title:
-    uses: RodrigoFAbreu/action-workflows/.github/workflows/pr-title.yml@v1
+    uses: RodrigoFAbreu/action-workflows/.github/workflows/pr-title.yml@main
   latest:
     needs: [version, image, release]
     if: needs.version.outputs.next != ''
     permissions:
       contents: read
       packages: write
-    uses: RodrigoFAbreu/action-workflows/.github/workflows/promote-image.yml@v1
+    uses: RodrigoFAbreu/action-workflows/.github/workflows/promote-image.yml@main
     with:
       image: ghcr.io/example/application
       source: ghcr.io/example/application@${{ needs.image.outputs.digest }}
@@ -56,3 +55,19 @@ by the caller.
 
 This public repository contains generic CI code for public and private callers.
 Credentials and personal infrastructure configuration stay outside it.
+
+## Orchestration and manual execution
+
+Caller entry points select events and sequence reusable jobs. A CI or Main
+workflow runs checks for pull requests and pushes, then calls the application's
+release workflow for a validated main commit. Reusable application workflows
+use workflow_call, with workflow_dispatch for meaningful isolated runs.
+
+The shared title workflow accepts a manual title check. The shared npm and Maven
+workflows can be dispatched against a public source repository with explicit
+toolchain settings. Publication is off by default and requires the corresponding
+repository Secret. Normal reusable calls check out the caller repository.
+
+Image promotion is call-only because it belongs after the caller's completed
+release gate. Retry its job from that release run. GitOps can keep its existing
+single validation workflow directly when shared orchestration adds no value.
