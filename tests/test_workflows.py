@@ -63,6 +63,39 @@ class WorkflowTests(unittest.TestCase):
                 self.assertIn('--prefer-index=false --tag ghcr.io/example/app:latest ' + source, calls)
                 self.assertTrue(calls.rstrip().endswith('logout ghcr.io'))
 
+    def test_python_tests_propagate_command_and_pipeline_failures(self):
+        source = (ROOT / '.github/workflows/python-tests.yml').read_text()
+        self.assertIn('  workflow_call:', source)
+        self.assertIn('  workflow_dispatch:', source)
+        script = source.split('        run: ', 2)[2].split('\n', 1)[0]
+        for command, success in [('python -c "print(42)"', True),
+                                 ('python -c "raise SystemExit(7)"', False),
+                                 ('false | true', False)]:
+            with self.subTest(command=command):
+                self.assertEqual(run_script(script, {'TEST_COMMAND': command}) == 0, success)
+        self.assertIn("!cancelled() && inputs.after-test-command != ''", source)
+
+    def test_maven_prerequisites_fail_before_verification(self):
+        source = (ROOT / '.github/workflows/java-build-publish.yml').read_text()
+        self.assertLess(source.index('name: Run project prerequisites'),
+                        source.index('run: ./mvnw --batch-mode verify'))
+        script = source.split('      - name: Run project prerequisites\n', 1)[1]
+        script = script.split('        run: ', 1)[1].split('\n', 1)[0]
+        self.assertNotEqual(run_script(script, {'CHECK_COMMAND': 'false'}), 0)
+
+    def test_language_test_workflows_delegate_with_publication_disabled(self):
+        for language, implementation in [('java', 'java-build-publish.yml'),
+                                         ('npm', 'npm-build-publish.yml')]:
+            with self.subTest(language=language):
+                source = (ROOT / '.github/workflows' / (language + '-tests.yml')).read_text()
+                self.assertIn('  workflow_call:', source)
+                self.assertIn('  workflow_dispatch:', source)
+                self.assertIn('uses: ./.github/workflows/' + implementation, source)
+                self.assertIn('      publish: false', source)
+                self.assertNotIn('      publish:\n', source)
+        maven = (ROOT / '.github/workflows/java-build-publish.yml').read_text()
+        self.assertIn('run: ./mvnw --batch-mode verify', maven)
+
     def test_package_publish_requires_release_context_and_token(self):
         for filename, heading, token, executable in [
             ('npm-build-publish.yml', 'Publish package', 'NODE_AUTH_TOKEN', 'npm'),

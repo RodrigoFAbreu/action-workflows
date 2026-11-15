@@ -11,6 +11,10 @@ on:
       distribution:
         type: string
         default: temurin
+      before-check-command:
+        description: Repository-specific prerequisites before Maven verification
+        type: string
+        default: ''
       publish:
         type: boolean
         default: false
@@ -37,6 +41,10 @@ on:
       distribution:
         type: string
         default: temurin
+      before-check-command:
+        description: Repository-specific prerequisites before Maven verification
+        type: string
+        default: ''
       publish:
         type: boolean
         default: false
@@ -68,6 +76,11 @@ jobs:
           server-id: ${{ inputs.server-id }}
           server-username: MAVEN_USERNAME
           server-password: MAVEN_TOKEN
+      - name: Run project prerequisites
+        if: inputs.before-check-command != ''
+        env:
+          CHECK_COMMAND: ${{ inputs.before-check-command }}
+        run: bash --noprofile --norc -e -o pipefail -c "$CHECK_COMMAND"
       - run: ./mvnw --batch-mode verify
       - name: Publish artifacts
         if: inputs.publish

@@ -5,6 +5,9 @@ version calculation, repository-specific validation and release completion gates
 
 | Workflow | Contract |
 | --- | --- |
+| `python-tests.yml` | Sets up Python, installs optional requirements and runs repository tests and associated validation |
+| `java-tests.yml` | Runs Maven verify, including unit/integration tests and verification plugins |
+| `npm-tests.yml` | Runs JavaScript/TypeScript package tests and an optional build |
 | `pr-title.yml` | Validates the shared Conventional Commit grammar |
 | `promote-image.yml` | Copies an already released GHCR manifest to latest, preserving its format and architectures |
 | `npm-build-publish.yml` | Installs locked dependencies, runs selected scripts and optionally publishes an npm package |
@@ -71,3 +74,25 @@ repository Secret. Normal reusable calls check out the caller repository.
 Image promotion is call-only because it belongs after the caller's completed
 release gate. Retry its job from that release run. GitOps can keep its existing
 single validation workflow directly when shared orchestration adds no value.
+
+## Shared language tests
+
+Application CI runs its test jobs for pull requests and pushes to main. A release
+job depends on successful validation and runs for a main push. The release
+workflow is callable by that CI entry point.
+
+- Python callers use python-tests.yml with their supported versions, optional
+  requirements file and repository test command. An optional additional command
+  retains workflow linting after a failed primary check.
+- JavaScript and TypeScript callers use npm-tests.yml.
+  npm ci, the selected test script and build script run in the caller directory.
+- Java callers use java-tests.yml. Maven verify runs
+  the project's tests, build and verification plugins. An optional prerequisite
+  command checks project-specific contracts before Maven starts.
+
+Commands are reviewed repository code supplied by the caller. Shared workflows
+handle toolchains and execution, and application scripts select their assertions.
+Python, npm and Java test workflows all have manual dispatch entry points.
+The Java and npm test workflows reuse the package workflow implementations with
+publication disabled. Package publication remains available through the existing
+build-publish workflows.
