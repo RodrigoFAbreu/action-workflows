@@ -63,17 +63,29 @@ class WorkflowTests(unittest.TestCase):
                 self.assertIn('--prefer-index=false --tag ghcr.io/example/app:latest ' + source, calls)
                 self.assertTrue(calls.rstrip().endswith('logout ghcr.io'))
 
-    def test_python_tests_propagate_command_and_pipeline_failures(self):
+    def test_python_discovery_handles_paths_patterns_and_test_failures(self):
+        script = step_script('python-tests.yml', 'Run Python tests')
+        for failing in (False, True):
+            with self.subTest(failing=failing), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                tests = directory / 'custom tests'
+                tests.mkdir()
+                (tests / '__init__.py').touch()
+                (tests / 'case_sample.py').write_text(
+                    'import unittest\nclass Sample(unittest.TestCase):\n'
+                    '    def test_result(self):\n        self.assertTrue(' + str(not failing) + ')\n')
+                (tests / 'test_ignored.py').write_text('raise RuntimeError("wrong pattern")\n')
+                for top_level in ('', str(directory)):
+                    environment = {'TEST_DIRECTORY': str(tests), 'TEST_PATTERN': 'case*.py',
+                                   'TOP_LEVEL_DIRECTORY': top_level}
+                    self.assertEqual(run_script(script, environment) == 0, not failing)
+
+    def test_legacy_python_inputs_remain_usable_during_migration(self):
         source = (ROOT / '.github/workflows/python-tests.yml').read_text()
-        self.assertIn('  workflow_call:', source)
-        self.assertIn('  workflow_dispatch:', source)
-        script = source.split('        run: ', 2)[2].split('\n', 1)[0]
-        for command, success in [('python -c "print(42)"', True),
-                                 ('python -c "raise SystemExit(7)"', False),
-                                 ('false | true', False)]:
-            with self.subTest(command=command):
-                self.assertEqual(run_script(script, {'TEST_COMMAND': command}) == 0, success)
-        self.assertIn("!cancelled() && inputs.after-test-command != ''", source)
+        script = source.split('      - name: Run legacy caller tests during migration\n', 1)[1]
+        script = script.split('        run: ', 1)[1].split('\n', 1)[0]
+        self.assertEqual(run_script(script, {'TEST_COMMAND': 'true'}), 0)
+        self.assertNotEqual(run_script(script, {'TEST_COMMAND': 'false | true'}), 0)
 
     def test_maven_prerequisites_fail_before_verification(self):
         source = (ROOT / '.github/workflows/java-build-publish.yml').read_text()
@@ -89,10 +101,17 @@ class WorkflowTests(unittest.TestCase):
             with self.subTest(language=language):
                 source = (ROOT / '.github/workflows' / (language + '-tests.yml')).read_text()
                 self.assertIn('  workflow_call:', source)
-                self.assertIn('  workflow_dispatch:', source)
                 self.assertIn('uses: ./.github/workflows/' + implementation, source)
                 self.assertIn('      publish: false', source)
                 self.assertNotIn('      publish:\n', source)
+                self.assertNotIn('      repository:', source)
+                self.assertNotIn('command:', source)
+        npm = (ROOT / '.github/workflows/npm-tests.yml').read_text()
+        self.assertIn('      test-script: test', npm)
+        self.assertIn("      build-script: ''", npm)
+        python = (ROOT / '.github/workflows/python-tests.yml').read_text()
+        self.assertNotIn('      repository:', python)
+        self.assertIn('      test-directory:\n        type: string\n        default: tests', python)
         maven = (ROOT / '.github/workflows/java-build-publish.yml').read_text()
         self.assertIn('run: ./mvnw --batch-mode verify', maven)
 

@@ -5,75 +5,84 @@ on:
       python-version:
         type: string
         required: true
-      test-command:
+      working-directory:
         type: string
-        required: true
+        default: .
+      test-directory:
+        type: string
+        default: tests
+      test-pattern:
+        type: string
+        default: test*.py
+      top-level-directory:
+        description: Optional unittest import root, relative to the working directory
+        type: string
+        default: ''
       requirements-file:
+        type: string
+        default: ''
+      package-directory:
+        description: Optional local Python package to install before testing
         type: string
         default: ''
       cache-dependency-path:
         type: string
         default: ''
-      after-test-command:
-        description: Additional checks run even when the primary checks fail
-        type: string
-        default: ''
-      repository:
-        description: Source repository, defaults to the caller
-        type: string
-        default: ''
-  workflow_dispatch:
-    inputs:
-      python-version:
-        description: Python version or newline-separated supported versions
-        type: string
-        required: true
+      # Retain these two inputs while existing main-branch callers migrate.
       test-command:
-        description: Repository test or validation command
-        type: string
-        required: true
-      requirements-file:
-        description: Optional pip requirements file
-        type: string
-        default: ''
-      cache-dependency-path:
-        description: Optional pip cache dependency paths
+        description: Deprecated migration input, use test-directory
         type: string
         default: ''
       after-test-command:
-        description: Additional checks run even when the primary checks fail
+        description: Deprecated migration input, move custom validation to caller jobs
         type: string
         default: ''
-      repository:
-        description: Public source repository for this standalone run
-        type: string
-        required: true
 permissions:
   contents: read
 jobs:
   python:
     name: Python tests
     runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
     steps:
       - uses: actions/checkout@v6
         with:
-          repository: ${{ inputs.repository || github.repository }}
           persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ inputs.python-version }}
           cache: ${{ inputs.requirements-file != '' && 'pip' || '' }}
-          cache-dependency-path: ${{ inputs.cache-dependency-path || inputs.requirements-file }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path || format('{0}/{1}', inputs.working-directory, inputs.requirements-file) }}
       - name: Install test dependencies
         if: inputs.requirements-file != ''
         env:
           REQUIREMENTS_FILE: ${{ inputs.requirements-file }}
         run: python -m pip install --requirement "$REQUIREMENTS_FILE"
+      - name: Install local package
+        if: inputs.package-directory != ''
+        env:
+          PACKAGE_DIRECTORY: ${{ inputs.package-directory }}
+        run: python -m pip install "$PACKAGE_DIRECTORY"
       - name: Run Python tests
+        if: inputs.test-command == ''
+        env:
+          TEST_DIRECTORY: ${{ inputs.test-directory }}
+          TEST_PATTERN: ${{ inputs.test-pattern }}
+          TOP_LEVEL_DIRECTORY: ${{ inputs.top-level-directory }}
+        run: |
+          arguments=(--start-directory "$TEST_DIRECTORY" --pattern "$TEST_PATTERN" --verbose)
+          if [ -n "$TOP_LEVEL_DIRECTORY" ]; then
+            arguments+=(--top-level-directory "$TOP_LEVEL_DIRECTORY")
+          fi
+          python -m unittest discover "${arguments[@]}"
+      - name: Run legacy caller tests during migration
+        if: inputs.test-command != ''
         env:
           TEST_COMMAND: ${{ inputs.test-command }}
         run: bash --noprofile --norc -e -o pipefail -c "$TEST_COMMAND"
-      - name: Run additional checks
+      - name: Run legacy additional validation during migration
         if: ${{ !cancelled() && inputs.after-test-command != '' }}
         env:
           TEST_COMMAND: ${{ inputs.after-test-command }}

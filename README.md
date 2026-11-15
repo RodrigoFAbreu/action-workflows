@@ -5,9 +5,9 @@ version calculation, repository-specific validation and release completion gates
 
 | Workflow | Contract |
 | --- | --- |
-| `python-tests.yml` | Sets up Python, installs optional requirements and runs repository tests and associated validation |
+| `python-tests.yml` | Sets up Python, installs optional requirements and discovers unittest suites from configured directories |
 | `java-tests.yml` | Runs Maven verify, including unit/integration tests and verification plugins |
-| `npm-tests.yml` | Runs JavaScript/TypeScript package tests and an optional build |
+| `npm-tests.yml` | Runs npm test in the caller package |
 | `pr-title.yml` | Validates the shared Conventional Commit grammar |
 | `promote-image.yml` | Copies an already released GHCR manifest to latest, preserving its format and architectures |
 | `npm-build-publish.yml` | Installs locked dependencies, runs selected scripts and optionally publishes an npm package |
@@ -66,10 +66,10 @@ workflow runs checks for pull requests and pushes, then calls the application's
 release workflow for a validated main commit. Reusable application workflows
 use workflow_call, with workflow_dispatch for meaningful isolated runs.
 
-The shared title workflow accepts a manual title check. The shared npm and Maven
-workflows can be dispatched against a public source repository with explicit
-toolchain settings. Publication is off by default and requires the corresponding
-repository Secret. Normal reusable calls check out the caller repository.
+The shared title workflow accepts a manual title check. Language test workflows
+are called from the consumer CI or its manually dispatched component workflow.
+Checkout uses the calling repository and triggering revision. The test workflows
+have no repository override input.
 
 Image promotion is call-only because it belongs after the caller's completed
 release gate. Retry its job from that release run. GitOps can keep its existing
@@ -81,18 +81,37 @@ Application CI runs its test jobs for pull requests and pushes to main. A releas
 job depends on successful validation and runs for a main push. The release
 workflow is callable by that CI entry point.
 
-- Python callers use python-tests.yml with their supported versions, optional
-  requirements file and repository test command. An optional additional command
-  retains workflow linting after a failed primary check.
-- JavaScript and TypeScript callers use npm-tests.yml.
-  npm ci, the selected test script and build script run in the caller directory.
-- Java callers use java-tests.yml. Maven verify runs
-  the project's tests, build and verification plugins. An optional prerequisite
-  command checks project-specific contracts before Maven starts.
+- Python callers use python-tests.yml. It runs python -m unittest discover with
+  test-directory defaulting to tests and test-pattern defaulting to test*.py.
+  Optional working-directory, top-level-directory, requirements-file and
+  package-directory inputs configure imports and dependencies. Paths are
+  relative to the working directory. cache-dependency-path is repository-relative.
+- Java callers use java-tests.yml with the Java version and project directory.
+  Maven verify runs the project's tests and verification plugins.
+- JavaScript and TypeScript callers use npm-tests.yml with the Node.js version
+  and package directory. npm ci installs locked dependencies, then npm test runs
+  the package's test script.
 
-Commands are reviewed repository code supplied by the caller. Shared workflows
-handle toolchains and execution, and application scripts select their assertions.
-Python, npm and Java test workflows all have manual dispatch entry points.
-The Java and npm test workflows reuse the package workflow implementations with
-publication disabled. Package publication remains available through the existing
-build-publish workflows.
+Custom lint, build checks and project assertions belong in caller-owned jobs.
+The shared language workflows own the test commands. The Java and npm test
+workflows reuse the package implementations with publication disabled.
+
+Example Python caller configuration:
+
+```yaml
+jobs:
+  tests:
+    uses: RodrigoFAbreu/action-workflows/.github/workflows/python-tests.yml@main
+    with:
+      python-version: '3.12'
+      test-directory: scripts/release
+```
+
+## Main-branch interface migration
+
+The Python test-command and after-test-command inputs are temporarily accepted
+for existing main-branch callers. Existing docs main still supplies test-command.
+New calls use the structured test-directory interface. Merge this shared change,
+validate and merge the consumer PRs, then remove the two deprecated inputs and
+their legacy steps after confirming no reviewed caller still uses them.
+This ordering preserves existing CI while all consumers follow main.
