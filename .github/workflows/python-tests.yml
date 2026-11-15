@@ -28,15 +28,6 @@ on:
       cache-dependency-path:
         type: string
         default: ''
-      # Retain these two inputs while existing main-branch callers migrate.
-      test-command:
-        description: Deprecated migration input, use test-directory
-        type: string
-        default: ''
-      after-test-command:
-        description: Deprecated migration input, move custom validation to caller jobs
-        type: string
-        default: ''
 permissions:
   contents: read
 jobs:
@@ -66,7 +57,6 @@ jobs:
           PACKAGE_DIRECTORY: ${{ inputs.package-directory }}
         run: python -m pip install "$PACKAGE_DIRECTORY"
       - name: Run Python tests
-        if: inputs.test-command == ''
         env:
           TEST_DIRECTORY: ${{ inputs.test-directory }}
           TEST_PATTERN: ${{ inputs.test-pattern }}
@@ -77,13 +67,3 @@ jobs:
             arguments+=(--top-level-directory "$TOP_LEVEL_DIRECTORY")
           fi
           python -m unittest discover "${arguments[@]}"
-      - name: Run legacy caller tests during migration
-        if: inputs.test-command != ''
-        env:
-          TEST_COMMAND: ${{ inputs.test-command }}
-        run: bash --noprofile --norc -e -o pipefail -c "$TEST_COMMAND"
-      - name: Run legacy additional validation during migration
-        if: ${{ !cancelled() && inputs.after-test-command != '' }}
-        env:
-          TEST_COMMAND: ${{ inputs.after-test-command }}
-        run: bash --noprofile --norc -e -o pipefail -c "$TEST_COMMAND"
