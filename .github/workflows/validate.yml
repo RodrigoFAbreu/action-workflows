@@ -8,11 +8,11 @@ permissions:
   contents: read
 jobs:
   tests:
-    uses: ./.github/workflows/python-checks.yml
+    uses: ./.github/workflows/python-tests.yml
     with:
       python-version: '3.12'
-      check-command: python -m unittest discover -s tests -v
-      after-check-command: |
+      test-command: python -m unittest discover -s tests -v
+      after-test-command: |
         docker run --rm --volume "$PWD:/repo" --workdir /repo \
           rhysd/actionlint:1.7.12 -color .github/workflows/*.yml
   required:

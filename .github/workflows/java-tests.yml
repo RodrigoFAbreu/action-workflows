@@ -1,0 +1,54 @@
+name: Java tests
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        type: string
+        required: true
+      working-directory:
+        type: string
+        default: .
+      distribution:
+        type: string
+        default: temurin
+      before-test-command:
+        description: Repository prerequisites before Maven verification
+        type: string
+        default: ''
+      repository:
+        description: Source repository, defaults to the caller
+        type: string
+        default: ''
+  workflow_dispatch:
+    inputs:
+      java-version:
+        description: Java toolchain version
+        type: string
+        required: true
+      working-directory:
+        type: string
+        default: .
+      distribution:
+        type: string
+        default: temurin
+      before-test-command:
+        description: Repository prerequisites before Maven verification
+        type: string
+        default: ''
+      repository:
+        description: Public source repository for this standalone run
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  tests:
+    name: Java tests
+    uses: ./.github/workflows/java-build-publish.yml
+    with:
+      java-version: ${{ inputs.java-version }}
+      working-directory: ${{ inputs.working-directory }}
+      distribution: ${{ inputs.distribution }}
+      before-check-command: ${{ inputs.before-test-command }}
+      repository: ${{ inputs.repository }}
+      publish: false

@@ -1,11 +1,11 @@
-name: Python checks
+name: Python tests
 on:
   workflow_call:
     inputs:
       python-version:
         type: string
         required: true
-      check-command:
+      test-command:
         type: string
         required: true
       requirements-file:
@@ -14,7 +14,7 @@ on:
       cache-dependency-path:
         type: string
         default: ''
-      after-check-command:
+      after-test-command:
         description: Additional checks run even when the primary checks fail
         type: string
         default: ''
@@ -28,7 +28,7 @@ on:
         description: Python version or newline-separated supported versions
         type: string
         required: true
-      check-command:
+      test-command:
         description: Repository test or validation command
         type: string
         required: true
@@ -40,7 +40,7 @@ on:
         description: Optional pip cache dependency paths
         type: string
         default: ''
-      after-check-command:
+      after-test-command:
         description: Additional checks run even when the primary checks fail
         type: string
         default: ''
@@ -52,7 +52,7 @@ permissions:
   contents: read
 jobs:
   python:
-    name: Python checks
+    name: Python tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -69,12 +69,12 @@ jobs:
         env:
           REQUIREMENTS_FILE: ${{ inputs.requirements-file }}
         run: python -m pip install --requirement "$REQUIREMENTS_FILE"
-      - name: Run Python checks
+      - name: Run Python tests
         env:
-          CHECK_COMMAND: ${{ inputs.check-command }}
-        run: bash --noprofile --norc -e -o pipefail -c "$CHECK_COMMAND"
+          TEST_COMMAND: ${{ inputs.test-command }}
+        run: bash --noprofile --norc -e -o pipefail -c "$TEST_COMMAND"
       - name: Run additional checks
-        if: ${{ !cancelled() && inputs.after-check-command != '' }}
+        if: ${{ !cancelled() && inputs.after-test-command != '' }}
         env:
-          CHECK_COMMAND: ${{ inputs.after-check-command }}
-        run: bash --noprofile --norc -e -o pipefail -c "$CHECK_COMMAND"
+          TEST_COMMAND: ${{ inputs.after-test-command }}
+        run: bash --noprofile --norc -e -o pipefail -c "$TEST_COMMAND"
