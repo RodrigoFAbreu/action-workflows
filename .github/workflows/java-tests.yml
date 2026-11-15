@@ -16,9 +16,18 @@ permissions:
 jobs:
   tests:
     name: Java tests
-    uses: ./.github/workflows/java-build-publish.yml
-    with:
-      java-version: ${{ inputs.java-version }}
-      working-directory: ${{ inputs.working-directory }}
-      distribution: ${{ inputs.distribution }}
-      publish: false
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: ${{ inputs.distribution }}
+          java-version: ${{ inputs.java-version }}
+          cache: maven
+          cache-dependency-path: ${{ inputs.working-directory }}/pom.xml
+      - run: ./mvnw --batch-mode --no-transfer-progress verify

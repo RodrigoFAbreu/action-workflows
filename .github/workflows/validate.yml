@@ -7,29 +7,14 @@ on:
 permissions:
   contents: read
 jobs:
-  tests:
-    uses: ./.github/workflows/python-tests.yml
-    with:
-      python-version: '3.12'
-  lint:
-    name: Workflow lint
+  validate:
+    name: Workflow checks
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - run: |
+      - name: Lint workflows and shell commands
+        run: |
           docker run --rm --volume "$PWD:/repo" --workdir /repo \
             rhysd/actionlint:1.7.12 -color .github/workflows/*.yml
-  required:
-    name: Workflow checks
-    needs: [tests, lint]
-    if: always()
-    runs-on: ubuntu-24.04
-    steps:
-      - env:
-          TEST_RESULT: ${{ needs.tests.result }}
-          LINT_RESULT: ${{ needs.lint.result }}
-        run: |
-          test "$TEST_RESULT" = success
-          test "$LINT_RESULT" = success

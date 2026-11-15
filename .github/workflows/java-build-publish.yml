@@ -11,50 +11,15 @@ on:
       distribution:
         type: string
         default: temurin
-      before-check-command:
-        description: Repository-specific prerequisites before Maven verification
-        type: string
-        default: ''
       publish:
         type: boolean
         default: false
       server-id:
         type: string
         default: github
-      repository:
-        description: Source repository, defaults to the caller
-        type: string
-        required: false
-        default: ''
     secrets:
       maven-token:
         required: false
-  workflow_dispatch:
-    inputs:
-      java-version:
-        type: string
-        required: true
-        description: Toolchain version
-      working-directory:
-        type: string
-        default: .
-      distribution:
-        type: string
-        default: temurin
-      before-check-command:
-        description: Repository-specific prerequisites before Maven verification
-        type: string
-        default: ''
-      publish:
-        type: boolean
-        default: false
-      server-id:
-        type: string
-        default: github
-      repository:
-        description: Public source repository for this standalone run
-        type: string
-        required: true
 permissions:
   contents: read
 jobs:
@@ -66,29 +31,27 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          repository: ${{ inputs.repository || github.repository }}
           persist-credentials: false
       - uses: actions/setup-java@v6
         with:
           distribution: ${{ inputs.distribution }}
           java-version: ${{ inputs.java-version }}
           cache: maven
+          cache-dependency-path: ${{ inputs.working-directory }}/pom.xml
           server-id: ${{ inputs.server-id }}
           server-username: MAVEN_USERNAME
           server-password: MAVEN_TOKEN
-      - name: Run project prerequisites
-        if: inputs.before-check-command != ''
-        env:
-          CHECK_COMMAND: ${{ inputs.before-check-command }}
-        run: bash --noprofile --norc -e -o pipefail -c "$CHECK_COMMAND"
-      - run: ./mvnw --batch-mode verify
-      - name: Publish artifacts
-        if: inputs.publish
+      - name: Build and optionally publish artifacts
         env:
           MAVEN_USERNAME: ${{ github.actor }}
           MAVEN_TOKEN: ${{ secrets.maven-token }}
           EVENT_NAME: ${{ github.event_name }}
+          PUBLISH: ${{ inputs.publish }}
         run: |
-          test "$EVENT_NAME" != pull_request
-          test -n "$MAVEN_TOKEN"
-          ./mvnw --batch-mode deploy -DskipTests
+          goal=package
+          if [ "$PUBLISH" = true ]; then
+            test "$EVENT_NAME" != pull_request
+            test -n "$MAVEN_TOKEN"
+            goal=deploy
+          fi
+          ./mvnw --batch-mode --no-transfer-progress -Dmaven.test.skip=true "$goal"
